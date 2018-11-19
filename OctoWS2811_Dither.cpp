@@ -424,7 +424,7 @@ void OctoWS2811_Dither::fillFrameBuffer()
 		strip = num / stripLen;  // Cortex-M4 has 2 cycle unsigned divide :-)
 		offset = num % stripLen;
 
-		p = ((uint32_t *)drawBuffer) + offset * 6;
+		p = ((uint32_t *)frameBuffer) + offset * 6;
 
 		mask32 = (0x01010101) << strip;
 
