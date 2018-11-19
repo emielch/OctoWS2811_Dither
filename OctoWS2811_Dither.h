@@ -51,7 +51,7 @@
 
 
 struct COL_RGB {
-	uint8_t r, g, b;
+	uint8_t b, g, r;
 };
 
 

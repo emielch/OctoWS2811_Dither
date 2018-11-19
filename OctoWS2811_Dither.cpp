@@ -400,25 +400,26 @@ void OctoWS2811_Dither::fillFrameBuffer()
 	const uint8_t *ditheredLUT = gammaTable + (ditherCycle << 8);
 
 	for (int num = 0; num < stripLen * 8; num++) {
-		int color = ditheredLUT[copyBuffer[num].r] | ditheredLUT[copyBuffer[num].g] << 8 | ditheredLUT[copyBuffer[num].b] << 16;    //  can probably be optimized
+		int color;
 
 		switch (params & 7) {
 		case WS2811_RBG:
-			color = (color & 0xFF0000) | ((color << 8) & 0x00FF00) | ((color >> 8) & 0x0000FF);
+			color = ditheredLUT[copyBuffer[num].r] << 16 | ditheredLUT[copyBuffer[num].g] | ditheredLUT[copyBuffer[num].b] << 8;
 			break;
 		case WS2811_GRB:
-			color = ((color << 8) & 0xFF0000) | ((color >> 8) & 0x00FF00) | (color & 0x0000FF);
+			color = ditheredLUT[copyBuffer[num].r] << 8 | ditheredLUT[copyBuffer[num].g] << 16 | ditheredLUT[copyBuffer[num].b];
 			break;
 		case WS2811_GBR:
-			color = ((color << 16) & 0xFF0000) | ((color >> 8) & 0x00FFFF);
+			color = ditheredLUT[copyBuffer[num].r] | ditheredLUT[copyBuffer[num].g] << 16 | ditheredLUT[copyBuffer[num].b] << 8;
 			break;
 		case WS2811_BRG:
-			color = ((color << 8) & 0xFFFF00) | ((color >> 16) & 0x0000FF);
+			color = ditheredLUT[copyBuffer[num].r] << 8 | ditheredLUT[copyBuffer[num].g] | ditheredLUT[copyBuffer[num].b] << 16;
 			break;
 		case WS2811_BGR:
-			color = ((color << 16) & 0xFF0000) | (color & 0x00FF00) | ((color >> 16) & 0x0000FF);
+			color = ditheredLUT[copyBuffer[num].r] | ditheredLUT[copyBuffer[num].g] << 8 | ditheredLUT[copyBuffer[num].b] << 16;
 			break;
 		default:
+			color = ditheredLUT[copyBuffer[num].r] << 16 | ditheredLUT[copyBuffer[num].g] << 8 | ditheredLUT[copyBuffer[num].b];
 			break;
 		}
 		strip = num / stripLen;  // Cortex-M4 has 2 cycle unsigned divide :-)
@@ -456,35 +457,6 @@ void OctoWS2811_Dither::fillFrameBuffer()
 
 int OctoWS2811_Dither::getPixel(uint32_t num)
 {
-	uint32_t strip, offset, mask;
-	uint8_t bit, *p;
-	int color=0;
-
-	strip = num / stripLen;
-	offset = num % stripLen;
-	bit = (1<<strip);
-	p = ((uint8_t *)drawBuffer) + offset * 24;
-	for (mask = (1<<23) ; mask ; mask >>= 1) {
-		if (*p++ & bit) color |= mask;
-	}
-	switch (params & 7) {
-	  case WS2811_RBG:
-		color = (color&0xFF0000) | ((color<<8)&0x00FF00) | ((color>>8)&0x0000FF);
-		break;
-	  case WS2811_GRB:
-		color = ((color<<8)&0xFF0000) | ((color>>8)&0x00FF00) | (color&0x0000FF);
-		break;
-	  case WS2811_GBR:
-		color = ((color<<8)&0xFFFF00) | ((color>>16)&0x0000FF);
-		break;
-	  case WS2811_BRG:
-		color = ((color<<16)&0xFF0000) | ((color>>8)&0x00FFFF);
-		break;
-	  case WS2811_BGR:
-		color = ((color<<16)&0xFF0000) | (color&0x00FF00) | ((color>>16)&0x0000FF);
-		break;
-	  default:
-		break;
-	}
+	int color = *(int *)&drawBuffer[num] & 0x00FFFFFF;
 	return color;
 }
