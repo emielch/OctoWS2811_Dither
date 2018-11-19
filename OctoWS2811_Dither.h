@@ -21,11 +21,11 @@
     THE SOFTWARE.
 */
 
-#ifndef OctoWS2811_h
-#define OctoWS2811_h
+#ifndef OctoWS2811_Dither_h
+#define OctoWS2811_Dither_h
 
 #ifdef __AVR__
-#error "Sorry, OctoWS2811 only works on 32 bit Teensy boards.  AVR isn't supported."
+#error "Sorry, OctoWS2811_Dither only works on 32 bit Teensy boards.  AVR isn't supported."
 #endif
 
 #include <Arduino.h>
@@ -35,7 +35,7 @@
 #error "Teensyduino version 1.21 or later is required to compile this library."
 #endif
 #ifdef __AVR__
-#error "OctoWS2811 does not work with Teensy 2.0 or Teensy++ 2.0."
+#error "OctoWS2811_Dither does not work with Teensy 2.0 or Teensy++ 2.0."
 #endif
 
 #define WS2811_RGB	0	// The WS2811 datasheet documents this way
@@ -50,17 +50,30 @@
 #define WS2813_800kHz 0x20	// WS2813 are close to 800 kHz but has 300 us frame set delay
 
 
-class OctoWS2811 {
-public:
-	OctoWS2811(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config = WS2811_GRB);
-	void begin(void);
-	void begin(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config = WS2811_GRB);
+struct COL_RGB {
+	uint8_t r, g, b;
+};
 
-	void setPixel(uint32_t num, int color);
-	void setPixel(uint32_t num, uint8_t red, uint8_t green, uint8_t blue) {
-		setPixel(num, color(red, green, blue));
+
+class OctoWS2811_Dither {
+public:
+	OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, COL_RGB *copyBuf, COL_RGB *drawBuf, uint8_t config = WS2811_GRB);
+	void begin(void);
+	void begin(uint32_t numPerStrip, void *frameBuf, COL_RGB *copyBuf, COL_RGB *drawBuf, uint8_t config = WS2811_GRB);
+
+	void setPixel(uint32_t num, int color) {
+		drawBuffer[num].b = color & 255;
+		drawBuffer[num].g = color >> 8 & 255;
+		drawBuffer[num].r = color >> 16 & 255;
 	}
+	void setPixel(uint32_t num, uint8_t red, uint8_t green, uint8_t blue) {
+		drawBuffer[num].r = red;
+		drawBuffer[num].g = green;
+		drawBuffer[num].b = blue;
+	}
+
 	int getPixel(uint32_t num);
+	COL_RGB getPixelRGB(uint32_t num) { return drawBuffer[num]; }
 
 	void show(void);
 	int busy(void);
@@ -75,11 +88,15 @@ public:
 
 private:
 	static uint16_t stripLen;
+	static uint8_t ditherCycle;
 	static void *frameBuffer;
-	static void *drawBuffer;
+	static COL_RGB *copyBuffer;
+	static COL_RGB *drawBuffer;
 	static uint8_t params;
 	static DMAChannel dma1, dma2, dma3;
 	static void isr(void);
+	static void fillFrameBuffer();
+	static void transfer();
 };
 
 #endif

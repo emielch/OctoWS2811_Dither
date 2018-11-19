@@ -24,25 +24,30 @@
 */
 
 #include <string.h>
-#include "OctoWS2811.h"
+#include "OctoWS2811_Dither.h"
+#include "gamma.h"
 
 
-uint16_t OctoWS2811::stripLen;
-void * OctoWS2811::frameBuffer;
-void * OctoWS2811::drawBuffer;
-uint8_t OctoWS2811::params;
-DMAChannel OctoWS2811::dma1;
-DMAChannel OctoWS2811::dma2;
-DMAChannel OctoWS2811::dma3;
+uint16_t OctoWS2811_Dither::stripLen;
+uint8_t OctoWS2811_Dither::ditherCycle;
+void * OctoWS2811_Dither::frameBuffer;
+COL_RGB * OctoWS2811_Dither::copyBuffer;
+COL_RGB * OctoWS2811_Dither::drawBuffer;
+uint8_t OctoWS2811_Dither::params;
+DMAChannel OctoWS2811_Dither::dma1;
+DMAChannel OctoWS2811_Dither::dma2;
+DMAChannel OctoWS2811_Dither::dma3;
 
 static uint8_t ones = 0xFF;
 static volatile uint8_t update_in_progress = 0;
+static volatile uint8_t update_ready = 0;
 static uint32_t update_completed_at = 0;
 
-OctoWS2811::OctoWS2811(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config)
+OctoWS2811_Dither::OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, COL_RGB *copyBuf, COL_RGB *drawBuf, uint8_t config)
 {
 	stripLen = numPerStrip;
 	frameBuffer = frameBuf;
+	copyBuffer = copyBuf;
 	drawBuffer = drawBuf;
 	params = config;
 }
@@ -68,27 +73,26 @@ OctoWS2811::OctoWS2811(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint
 // Discussion about timing and flicker & color shift issues:
 // http://forum.pjrc.com/threads/23877-WS2812B-compatible-with-OctoWS2811-library?p=38190&viewfull=1#post38190
 
-void OctoWS2811::begin(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config)
+void OctoWS2811_Dither::begin(uint32_t numPerStrip, void *frameBuf, COL_RGB *copyBuf, COL_RGB *drawBuf, uint8_t config)
 {
 	stripLen = numPerStrip;
 	frameBuffer = frameBuf;
+	copyBuffer = copyBuf;
 	drawBuffer = drawBuf;
 	params = config;
 	begin();
 }
 
-void OctoWS2811::begin(void)
+void OctoWS2811_Dither::begin(void)
 {
 	uint32_t bufsize, frequency;
 	bufsize = stripLen*24;
 
+	ditherCycle = 0;
+
 	// set up the buffers
 	memset(frameBuffer, 0, bufsize);
-	if (drawBuffer) {
-		memset(drawBuffer, 0, bufsize);
-	} else {
-		drawBuffer = frameBuffer;
-	}
+	memset(drawBuffer, 0, bufsize);
 
 	// configure the 8 output pins
 	GPIOD_PCOR = 0xFF;
@@ -224,7 +228,7 @@ void OctoWS2811::begin(void)
 	//pinMode(9, OUTPUT); // testing: oscilloscope trigger
 }
 
-void OctoWS2811::isr(void)
+void OctoWS2811_Dither::isr(void)
 {
 	//digitalWriteFast(9, HIGH);
 	//Serial1.print(".");
@@ -237,10 +241,12 @@ void OctoWS2811::isr(void)
 	//Serial1.print("*");
 	update_completed_at = micros();
 	update_in_progress = 0;
+
+	if (!update_ready) transfer();
 	//digitalWriteFast(9, LOW);
 }
 
-int OctoWS2811::busy(void)
+int OctoWS2811_Dither::busy(void)
 {
 	if (update_in_progress) return 1;
 	// busy for 50 (or 300 for ws2813) us after the done interrupt, for WS2811 reset
@@ -248,23 +254,22 @@ int OctoWS2811::busy(void)
 	return 0;
 }
 
-void OctoWS2811::show(void)
+void OctoWS2811_Dither::show(void)
 {
-	// wait for any prior DMA operation
-	//Serial1.print("1");
-	while (update_in_progress) ;
-	//Serial1.print("2");
-	// it's ok to copy the drawing buffer to the frame buffer
-	// during the 50us WS2811 reset time
-	if (drawBuffer != frameBuffer) {
-		// TODO: this could be faster with DMA, especially if the
-		// buffers are 32 bit aligned... but does it matter?
-		memcpy(frameBuffer, drawBuffer, stripLen * 24);
-	}
-	// wait for WS2811 reset
-	while (micros() - update_completed_at < 300) ;
-	// ok to start, but we must be very careful to begin
-	// without any prior 3 x 800kHz DMA requests pending
+	update_ready = 1;
+	while (update_in_progress);
+	update_ready = 0;
+
+	memcpy(copyBuffer, drawBuffer, stripLen * 24);
+
+	transfer();
+}
+
+void OctoWS2811_Dither::transfer(void)
+{
+	fillFrameBuffer();
+
+	while (micros() - update_completed_at < 300);
 
 #if defined(__MK20DX128__)
 	uint32_t cv = FTM1_C0V;
@@ -383,62 +388,73 @@ void OctoWS2811::show(void)
 	//Serial1.print("4");
 }
 
-void OctoWS2811::setPixel(uint32_t num, int color)
+
+
+void OctoWS2811_Dither::fillFrameBuffer()
 {
 	uint32_t strip, offset, mask32, *p;
 
-	switch (params & 7) {
-	  case WS2811_RBG:
-		color = (color&0xFF0000) | ((color<<8)&0x00FF00) | ((color>>8)&0x0000FF);
-		break;
-	  case WS2811_GRB:
-		color = ((color<<8)&0xFF0000) | ((color>>8)&0x00FF00) | (color&0x0000FF);
-		break;
-	  case WS2811_GBR:
-		color = ((color<<16)&0xFF0000) | ((color>>8)&0x00FFFF);
-		break;
-	  case WS2811_BRG:
-		color = ((color<<8)&0xFFFF00) | ((color>>16)&0x0000FF);
-		break;
-	  case WS2811_BGR:
-		color = ((color<<16)&0xFF0000) | (color&0x00FF00) | ((color>>16)&0x0000FF);
-		break;
-	  default:
-		break;
+	ditherCycle++;
+	if (ditherCycle > (1 << DITHER_BITS) - 1) ditherCycle = 0;
+
+	const uint8_t *ditheredLUT = gammaTable + (ditherCycle << 8);
+
+	for (int num = 0; num < stripLen * 8; num++) {
+		int color = ditheredLUT[copyBuffer[num].r] | ditheredLUT[copyBuffer[num].g] << 8 | ditheredLUT[copyBuffer[num].b] << 16;    //  can probably be optimized
+
+		switch (params & 7) {
+		case WS2811_RBG:
+			color = (color & 0xFF0000) | ((color << 8) & 0x00FF00) | ((color >> 8) & 0x0000FF);
+			break;
+		case WS2811_GRB:
+			color = ((color << 8) & 0xFF0000) | ((color >> 8) & 0x00FF00) | (color & 0x0000FF);
+			break;
+		case WS2811_GBR:
+			color = ((color << 16) & 0xFF0000) | ((color >> 8) & 0x00FFFF);
+			break;
+		case WS2811_BRG:
+			color = ((color << 8) & 0xFFFF00) | ((color >> 16) & 0x0000FF);
+			break;
+		case WS2811_BGR:
+			color = ((color << 16) & 0xFF0000) | (color & 0x00FF00) | ((color >> 16) & 0x0000FF);
+			break;
+		default:
+			break;
+		}
+		strip = num / stripLen;  // Cortex-M4 has 2 cycle unsigned divide :-)
+		offset = num % stripLen;
+
+		p = ((uint32_t *)drawBuffer) + offset * 6;
+
+		mask32 = (0x01010101) << strip;
+
+		// Set bytes 0-3
+		*p &= ~mask32;
+		*p |= (((color & 0x800000) >> 23) | ((color & 0x400000) >> 14) | ((color & 0x200000) >> 5) | ((color & 0x100000) << 4)) << strip;
+
+		// Set bytes 4-7
+		*++p &= ~mask32;
+		*p |= (((color & 0x80000) >> 19) | ((color & 0x40000) >> 10) | ((color & 0x20000) >> 1) | ((color & 0x10000) << 8)) << strip;
+
+		// Set bytes 8-11
+		*++p &= ~mask32;
+		*p |= (((color & 0x8000) >> 15) | ((color & 0x4000) >> 6) | ((color & 0x2000) << 3) | ((color & 0x1000) << 12)) << strip;
+
+		// Set bytes 12-15
+		*++p &= ~mask32;
+		*p |= (((color & 0x800) >> 11) | ((color & 0x400) >> 2) | ((color & 0x200) << 7) | ((color & 0x100) << 16)) << strip;
+
+		// Set bytes 16-19
+		*++p &= ~mask32;
+		*p |= (((color & 0x80) >> 7) | ((color & 0x40) << 2) | ((color & 0x20) << 11) | ((color & 0x10) << 20)) << strip;
+
+		// Set bytes 20-23
+		*++p &= ~mask32;
+		*p |= (((color & 0x8) >> 3) | ((color & 0x4) << 6) | ((color & 0x2) << 15) | ((color & 0x1) << 24)) << strip;
 	}
-	strip = num / stripLen;  // Cortex-M4 has 2 cycle unsigned divide :-)
-	offset = num % stripLen;
-	
-	p = ((uint32_t *) drawBuffer) + offset * 6;
-
-	mask32 = (0x01010101) << strip;
-
-	// Set bytes 0-3
-	*p &= ~mask32;
-	*p |= (((color & 0x800000) >> 23) | ((color & 0x400000) >> 14) | ((color & 0x200000) >> 5) | ((color & 0x100000) << 4)) << strip;   
-
-	// Set bytes 4-7
-	*++p &= ~mask32;
-	*p |= (((color & 0x80000) >> 19) | ((color & 0x40000) >> 10) | ((color & 0x20000) >> 1) | ((color & 0x10000) << 8)) << strip;
-
-	// Set bytes 8-11
-	*++p &= ~mask32;
-	*p |= (((color & 0x8000) >> 15) | ((color & 0x4000) >> 6) | ((color & 0x2000) << 3) | ((color & 0x1000) << 12)) << strip;
-
-	// Set bytes 12-15
-	*++p &= ~mask32;
-	*p |= (((color & 0x800) >> 11) | ((color & 0x400) >> 2) | ((color & 0x200) << 7) | ((color & 0x100) << 16)) << strip;
-
-	// Set bytes 16-19
-	*++p &= ~mask32;
-	*p |= (((color & 0x80) >> 7) | ((color & 0x40) << 2) | ((color & 0x20) << 11) | ((color & 0x10) << 20)) << strip;
-
-	// Set bytes 20-23
-	*++p &= ~mask32;
-	*p |= (((color & 0x8) >> 3) | ((color & 0x4) << 6) | ((color & 0x2) << 15) | ((color & 0x1) << 24)) << strip;
 }
 
-int OctoWS2811::getPixel(uint32_t num)
+int OctoWS2811_Dither::getPixel(uint32_t num)
 {
 	uint32_t strip, offset, mask;
 	uint8_t bit, *p;

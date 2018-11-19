@@ -38,16 +38,17 @@
             logic analyzer or even an LED (brighter = CPU busier)
 */
 
-#include <OctoWS2811.h>
+#include <OctoWS2811_Dither.h>
 
 const int ledsPerStrip = 60;
 
 DMAMEM int displayMemory[ledsPerStrip*6];
-int drawingMemory[ledsPerStrip*6];
+COL_RGB copyMemory[ledsPerStrip * 8];
+COL_RGB drawingMemory[ledsPerStrip*8];
 
 const int config = WS2811_GRB | WS2811_800kHz;
 
-OctoWS2811 leds(ledsPerStrip, displayMemory, drawingMemory, config);
+OctoWS2811_Dither leds(ledsPerStrip, displayMemory, copyMemory, drawingMemory, config);
 
 int rainbowColors[180];
 
