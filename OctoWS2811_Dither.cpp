@@ -257,10 +257,9 @@ int OctoWS2811_Dither::busy(void)
 void OctoWS2811_Dither::show(void)
 {
 	update_ready = 1;
+	memcpy(copyBuffer, drawBuffer, stripLen * 24);
 	while (update_in_progress);
 	update_ready = 0;
-
-	memcpy(copyBuffer, drawBuffer, stripLen * 24);
 
 	transfer();
 }
