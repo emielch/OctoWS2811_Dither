@@ -1,4 +1,4 @@
-/*  OctoWS2811 - High Performance WS2811 LED Display Library
+/*  OctoWS2811_Dither - High Performance WS2811 LED Display Library
     http://www.pjrc.com/teensy/td_libs_OctoWS2811.html
     Copyright (c) 2020 Paul Stoffregen, PJRC.COM, LLC
 
@@ -23,7 +23,7 @@
 
 #include <Arduino.h>
 
-#include "OctoWS2811.h"
+#include "OctoWS2811_Dither.h"
 
 #if defined(__IMXRT1062__)
 
@@ -38,15 +38,15 @@
 // smaller than the half the Cortex-M7 data cache.
 #define BYTES_PER_DMA 40
 
-uint8_t OctoWS2811::defaultPinList[8] = {2, 14, 7, 8, 6, 20, 21, 5};
-uint16_t OctoWS2811::stripLen;
-// uint8_t OctoWS2811::brightness = 255;
-void *OctoWS2811::frameBuffer;
-void *OctoWS2811::drawBuffer;
-uint8_t OctoWS2811::params;
-DMAChannel OctoWS2811::dma1;
-DMAChannel OctoWS2811::dma2;
-DMAChannel OctoWS2811::dma3;
+uint8_t OctoWS2811_Dither::defaultPinList[8] = {2, 14, 7, 8, 6, 20, 21, 5};
+uint16_t OctoWS2811_Dither::stripLen;
+// uint8_t OctoWS2811_Dither::brightness = 255;
+void *OctoWS2811_Dither::frameBuffer;
+void *OctoWS2811_Dither::drawBuffer;
+uint8_t OctoWS2811_Dither::params;
+DMAChannel OctoWS2811_Dither::dma1;
+DMAChannel OctoWS2811_Dither::dma2;
+DMAChannel OctoWS2811_Dither::dma3;
 static DMASetting dma2next;
 static uint32_t numbytes;
 
@@ -63,7 +63,7 @@ volatile bool dma_first;
 
 static uint32_t update_begin_micros = 0;
 
-OctoWS2811::OctoWS2811(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config, uint8_t numPins, const uint8_t *pinList) {
+OctoWS2811_Dither::OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config, uint8_t numPins, const uint8_t *pinList) {
   stripLen = numPerStrip;
   frameBuffer = frameBuf;
   drawBuffer = drawBuf;
@@ -73,7 +73,7 @@ OctoWS2811::OctoWS2811(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint
   memcpy(pinlist, pinList, numpins);
 }
 
-void OctoWS2811::begin(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config, uint8_t numPins, const uint8_t *pinList) {
+void OctoWS2811_Dither::begin(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config, uint8_t numPins, const uint8_t *pinList) {
   stripLen = numPerStrip;
   frameBuffer = frameBuf;
   drawBuffer = drawBuf;
@@ -84,7 +84,7 @@ void OctoWS2811::begin(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint
   begin();
 }
 
-int OctoWS2811::numPixels(void) {
+int OctoWS2811_Dither::numPixels(void) {
   return stripLen * numpins;
 }
 
@@ -93,7 +93,7 @@ static volatile uint32_t *standard_gpio_addr(volatile uint32_t *fastgpio) {
   return (volatile uint32_t *)((uint32_t)fastgpio - 0x01E48000);
 }
 
-void OctoWS2811::begin(void) {
+void OctoWS2811_Dither::begin(void) {
   if ((params & 0x1F) < 6) {
     numbytes = stripLen * 3;  // RGB formats
   } else {
@@ -240,7 +240,7 @@ static void fillbits(uint32_t *dest, const uint8_t *pixels, int n, uint32_t mask
   } while (--n > 0);
 }
 
-void OctoWS2811::show(void) {
+void OctoWS2811_Dither::show(void) {
   // wait for any prior DMA operation
   while (!dma3.complete())
     ;  // wait
@@ -317,7 +317,7 @@ void OctoWS2811::show(void) {
   update_begin_micros = micros();
 }
 
-void OctoWS2811::isr(void) {
+void OctoWS2811_Dither::isr(void) {
   // first ack the interrupt
   dma2.clearInterrupt();
 
@@ -356,7 +356,7 @@ void OctoWS2811::isr(void) {
   }
 }
 
-int OctoWS2811::busy(void) {
+int OctoWS2811_Dither::busy(void) {
   if (!dma3.complete())
     ;                                                                  // DMA still running
   if (micros() - update_begin_micros < numbytes * 10 + 300) return 1;  // WS2812 reset
@@ -368,7 +368,7 @@ int OctoWS2811::busy(void) {
 // different from Teensy 3.x, where the data was stored as bytes to write directly
 // to the GPIO output register.
 
-void OctoWS2811::setPixel(uint32_t num, int color) {
+void OctoWS2811_Dither::setPixel(uint32_t num, int color) {
   if ((params & 0x1F) < 6) {
     switch (params & 7) {
       case WS2811_RBG:
@@ -481,7 +481,7 @@ void OctoWS2811::setPixel(uint32_t num, int color) {
   }
 }
 
-int OctoWS2811::getPixel(uint32_t num) {
+int OctoWS2811_Dither::getPixel(uint32_t num) {
   int color = 0;
 
   if ((params & 0x1F) < 6) {

@@ -1,5 +1,5 @@
 {
-  "name": "OctoWS2811",
+  "name": "OctoWS2811_Dither",
   "frameworks": "Arduino",
   "platforms": "Teensy",
   "keywords": "serial",

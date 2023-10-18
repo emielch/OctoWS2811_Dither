@@ -1,4 +1,4 @@
-/*  OctoWS2811 - High Performance WS2811 LED Display Library
+/*  OctoWS2811_Dither - High Performance WS2811 LED Display Library
     http://www.pjrc.com/teensy/td_libs_OctoWS2811.html
     Copyright (c) 2013 Paul Stoffregen, PJRC.COM, LLC
     Some Teensy-LC support contributed by Mark Baysinger.
@@ -23,26 +23,26 @@
     THE SOFTWARE.
 */
 
-#include "OctoWS2811.h"
+#include "OctoWS2811_Dither.h"
 
 #include <Arduino.h>
 
 #if defined(__MK20DX128__) || defined(__MK20DX256__) || defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__MKL26Z64__)
 
-uint16_t OctoWS2811::stripLen;
-// uint8_t OctoWS2811::brightness = 255;
-void *OctoWS2811::frameBuffer;
-void *OctoWS2811::drawBuffer;
-uint8_t OctoWS2811::params;
-DMAChannel OctoWS2811::dma1;
-DMAChannel OctoWS2811::dma2;
-DMAChannel OctoWS2811::dma3;
+uint16_t OctoWS2811_Dither::stripLen;
+// uint8_t OctoWS2811_Dither::brightness = 255;
+void *OctoWS2811_Dither::frameBuffer;
+void *OctoWS2811_Dither::drawBuffer;
+uint8_t OctoWS2811_Dither::params;
+DMAChannel OctoWS2811_Dither::dma1;
+DMAChannel OctoWS2811_Dither::dma2;
+DMAChannel OctoWS2811_Dither::dma3;
 
 static uint8_t ones = 0xFF;
 static volatile uint8_t update_in_progress = 0;
 static uint32_t update_completed_at = 0;
 
-OctoWS2811::OctoWS2811(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config) {
+OctoWS2811_Dither::OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config) {
   stripLen = numPerStrip;
   frameBuffer = frameBuf;
   drawBuffer = drawBuf;
@@ -68,9 +68,9 @@ OctoWS2811::OctoWS2811(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint
 #define WS2811_TIMING_T1H 176
 
 // Discussion about timing and flicker & color shift issues:
-// http://forum.pjrc.com/threads/23877-WS2812B-compatible-with-OctoWS2811-library?p=38190&viewfull=1#post38190
+// http://forum.pjrc.com/threads/23877-WS2812B-compatible-with-OctoWS2811_Dither-library?p=38190&viewfull=1#post38190
 
-void OctoWS2811::begin(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config) {
+void OctoWS2811_Dither::begin(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config) {
   stripLen = numPerStrip;
   frameBuffer = frameBuf;
   drawBuffer = drawBuf;
@@ -78,7 +78,7 @@ void OctoWS2811::begin(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint
   begin();
 }
 
-void OctoWS2811::begin(void) {
+void OctoWS2811_Dither::begin(void) {
   uint32_t bufsize, frequency;
 
   if ((params & 0x1F) < 6) {
@@ -228,7 +228,7 @@ void OctoWS2811::begin(void) {
   // pinMode(9, OUTPUT); // testing: oscilloscope trigger
 }
 
-void OctoWS2811::isr(void) {
+void OctoWS2811_Dither::isr(void) {
   // digitalWriteFast(9, HIGH);
   // Serial1.print(".");
   // Serial1.println(dma3.CFG->DCR, HEX);
@@ -243,14 +243,14 @@ void OctoWS2811::isr(void) {
   // digitalWriteFast(9, LOW);
 }
 
-int OctoWS2811::busy(void) {
+int OctoWS2811_Dither::busy(void) {
   if (update_in_progress) return 1;
   // busy for 50 (or 300 for ws2813) us after the done interrupt, for WS2811 reset
   if (micros() - update_completed_at < 300) return 1;
   return 0;
 }
 
-void OctoWS2811::show(void) {
+void OctoWS2811_Dither::show(void) {
   // wait for any prior DMA operation
   // Serial1.print("1");
   while (update_in_progress)
@@ -402,7 +402,7 @@ void OctoWS2811::show(void) {
   // Serial1.print("4");
 }
 
-void OctoWS2811::setPixel(uint32_t num, int color) {
+void OctoWS2811_Dither::setPixel(uint32_t num, int color) {
   // Serial.printf("setPixel %u to color %08X\n", num, color);
   if ((params & 0x1F) < 6) {
     switch (params & 7) {
@@ -574,7 +574,7 @@ void OctoWS2811::setPixel(uint32_t num, int color) {
   }
 }
 
-int OctoWS2811::getPixel(uint32_t num) {
+int OctoWS2811_Dither::getPixel(uint32_t num) {
   uint32_t strip, offset, mask;
   uint8_t bit, *p;
   int color = 0;
