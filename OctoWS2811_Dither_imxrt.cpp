@@ -24,6 +24,7 @@
 #include <Arduino.h>
 
 #include "OctoWS2811_Dither.h"
+#include "gamma.h"
 
 #if defined(__IMXRT1062__)
 
@@ -33,15 +34,18 @@
 
 // Ordinary RGB data is converted to GPIO bitmasks on-the-fly using
 // a transmit buffer sized for 2 DMA transfers.  The larger this setting,
-// the more interrupt latency OctoWS2811 can tolerate, but the transmit
+// the more interrupt latency OctoWS2811_Dither can tolerate, but the transmit
 // buffer grows in size.  For good performance, the buffer should be kept
 // smaller than the half the Cortex-M7 data cache.
 #define BYTES_PER_DMA 40
+
+uint8_t OctoWS2811_Dither::ditherCycle;
 
 uint8_t OctoWS2811_Dither::defaultPinList[8] = {2, 14, 7, 8, 6, 20, 21, 5};
 uint16_t OctoWS2811_Dither::stripLen;
 // uint8_t OctoWS2811_Dither::brightness = 255;
 void *OctoWS2811_Dither::frameBuffer;
+void *OctoWS2811_Dither::copyBuffer;
 void *OctoWS2811_Dither::drawBuffer;
 uint8_t OctoWS2811_Dither::params;
 DMAChannel OctoWS2811_Dither::dma1;
@@ -61,11 +65,13 @@ DMAMEM static uint32_t bitdata[BYTES_PER_DMA * 64] __attribute__((used, aligned(
 volatile uint32_t framebuffer_index = 0;
 volatile bool dma_first;
 
+static volatile uint8_t update_ready = 0;
 static uint32_t update_begin_micros = 0;
 
-OctoWS2811_Dither::OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config, uint8_t numPins, const uint8_t *pinList) {
+OctoWS2811_Dither::OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void *copyBuf, void *drawBuf, uint8_t config, uint8_t numPins, const uint8_t *pinList) {
   stripLen = numPerStrip;
   frameBuffer = frameBuf;
+  copyBuffer = copyBuf;
   drawBuffer = drawBuf;
   params = config;
   if (numPins > NUM_DIGITAL_PINS) numPins = NUM_DIGITAL_PINS;
@@ -73,9 +79,10 @@ OctoWS2811_Dither::OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void 
   memcpy(pinlist, pinList, numpins);
 }
 
-void OctoWS2811_Dither::begin(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config, uint8_t numPins, const uint8_t *pinList) {
+void OctoWS2811_Dither::begin(uint32_t numPerStrip, void *frameBuf, void *copyBuf, void *drawBuf, uint8_t config, uint8_t numPins, const uint8_t *pinList) {
   stripLen = numPerStrip;
   frameBuffer = frameBuf;
+  copyBuffer = copyBuf;
   drawBuffer = drawBuf;
   params = config;
   if (numPins > NUM_DIGITAL_PINS) numPins = NUM_DIGITAL_PINS;
@@ -94,6 +101,8 @@ static volatile uint32_t *standard_gpio_addr(volatile uint32_t *fastgpio) {
 }
 
 void OctoWS2811_Dither::begin(void) {
+  ditherCycle = 0;
+
   if ((params & 0x1F) < 6) {
     numbytes = stripLen * 3;  // RGB formats
   } else {
@@ -207,6 +216,8 @@ void OctoWS2811_Dither::begin(void) {
   dma3.TCD->BITER_ELINKNO = numbytes * 8;
   dma3.TCD->CSR = DMA_TCD_CSR_DREQ | DMA_TCD_CSR_DONE;
   dma3.triggerAtHardwareEvent(DMAMUX_SOURCE_XBAR1_2);
+  dma3.interruptAtCompletion();
+  dma3.attachInterrupt(end_isr);
 
   // set up the buffers
   uint32_t bufsize = numbytes * numpins;
@@ -218,9 +229,9 @@ void OctoWS2811_Dither::begin(void) {
   }
 }
 
-static void fillbits(uint32_t *dest, const uint8_t *pixels, int n, uint32_t mask) {
+static void fillbits(uint32_t *dest, const uint8_t *pixels, int n, uint32_t mask, const uint8_t *ditheredLUT) {
   do {
-    uint8_t pix = *pixels++;
+    uint8_t pix = ditheredLUT[*pixels++];
     if (!(pix & 0x80)) *dest |= mask;
     dest += 4;
     if (!(pix & 0x40)) *dest |= mask;
@@ -241,14 +252,24 @@ static void fillbits(uint32_t *dest, const uint8_t *pixels, int n, uint32_t mask
 }
 
 void OctoWS2811_Dither::show(void) {
+  update_ready = 1;
+  memcpy(copyBuffer, drawBuffer, numbytes * numpins);
   // wait for any prior DMA operation
   while (!dma3.complete())
     ;  // wait
+  update_ready = 0;
+
+  transfer();
+}
+
+void OctoWS2811_Dither::transfer() {
+  ditherCycle++;
+  if (ditherCycle > (1 << DITHER_BITS) - 1) ditherCycle = 0;
 
   // it's ok to copy the drawing buffer to the frame buffer
   // during the 50us WS2811 reset time
   if (drawBuffer != frameBuffer) {
-    memcpy(frameBuffer, drawBuffer, numbytes * numpins);
+    memcpy(frameBuffer, copyBuffer, numbytes * numpins);
   }
 
   // disable timers
@@ -270,9 +291,10 @@ void OctoWS2811_Dither::show(void) {
   uint32_t count = numbytes;
   if (count > BYTES_PER_DMA * 2) count = BYTES_PER_DMA * 2;
   framebuffer_index = count;
+  const uint8_t *ditheredLUT = gammaTable + (ditherCycle << 8);
   for (uint32_t i = 0; i < numpins; i++) {
     fillbits(bitdata + pin_offset[i], (uint8_t *)frameBuffer + i * numbytes,
-             count, 1 << pin_bitnum[i]);
+             count, 1 << pin_bitnum[i], ditheredLUT);
   }
   arm_dcache_flush_delete(bitdata, count * 128);
   // digitalWriteFast(12, LOW);
@@ -317,6 +339,11 @@ void OctoWS2811_Dither::show(void) {
   update_begin_micros = micros();
 }
 
+void OctoWS2811_Dither::end_isr(void) {
+  dma3.clearInterrupt();
+  if (!update_ready) transfer();
+}
+
 void OctoWS2811_Dither::isr(void) {
   // first ack the interrupt
   dma2.clearInterrupt();
@@ -336,9 +363,10 @@ void OctoWS2811_Dither::isr(void) {
   uint32_t count = numbytes - framebuffer_index;
   if (count > BYTES_PER_DMA) count = BYTES_PER_DMA;
   framebuffer_index = index + count;
+  const uint8_t *ditheredLUT = gammaTable + (ditherCycle << 8);
   for (int i = 0; i < numpins; i++) {
     fillbits(dest + pin_offset[i], (uint8_t *)frameBuffer + index + i * numbytes,
-             count, 1 << pin_bitnum[i]);
+             count, 1 << pin_bitnum[i], ditheredLUT);
   }
   arm_dcache_flush_delete(dest, count * 128);
   // digitalWriteFast(12, LOW);
