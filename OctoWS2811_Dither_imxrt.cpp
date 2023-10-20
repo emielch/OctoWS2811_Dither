@@ -39,6 +39,7 @@
 // smaller than the half the Cortex-M7 data cache.
 #define BYTES_PER_DMA 40
 
+byte OctoWS2811_Dither::ditherBits;
 uint8_t OctoWS2811_Dither::ditherCycle;
 
 uint8_t OctoWS2811_Dither::defaultPinList[8] = {2, 14, 7, 8, 6, 20, 21, 5};
@@ -68,23 +69,25 @@ volatile bool dma_first;
 static volatile uint8_t update_ready = 0;
 static uint32_t update_begin_micros = 0;
 
-OctoWS2811_Dither::OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void *copyBuf, void *drawBuf, uint8_t config, uint8_t numPins, const uint8_t *pinList) {
+OctoWS2811_Dither::OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void *copyBuf, void *drawBuf, uint8_t config, byte ditBits, uint8_t numPins, const uint8_t *pinList) {
   stripLen = numPerStrip;
   frameBuffer = frameBuf;
   copyBuffer = copyBuf;
   drawBuffer = drawBuf;
   params = config;
+  ditherBits = ditBits;
   if (numPins > NUM_DIGITAL_PINS) numPins = NUM_DIGITAL_PINS;
   numpins = numPins;
   memcpy(pinlist, pinList, numpins);
 }
 
-void OctoWS2811_Dither::begin(uint32_t numPerStrip, void *frameBuf, void *copyBuf, void *drawBuf, uint8_t config, uint8_t numPins, const uint8_t *pinList) {
+void OctoWS2811_Dither::begin(uint32_t numPerStrip, void *frameBuf, void *copyBuf, void *drawBuf, uint8_t config, byte ditBits, uint8_t numPins, const uint8_t *pinList) {
   stripLen = numPerStrip;
   frameBuffer = frameBuf;
   copyBuffer = copyBuf;
   drawBuffer = drawBuf;
   params = config;
+  ditherBits = ditBits;
   if (numPins > NUM_DIGITAL_PINS) numPins = NUM_DIGITAL_PINS;
   numpins = numPins;
   memcpy(pinlist, pinList, numpins);
@@ -101,6 +104,7 @@ static volatile uint32_t *standard_gpio_addr(volatile uint32_t *fastgpio) {
 }
 
 void OctoWS2811_Dither::begin(void) {
+  ditherBits = min(ditherBits, DITHER_BITS);
   ditherCycle = 0;
 
   if ((params & 0x1F) < 6) {
@@ -264,7 +268,7 @@ void OctoWS2811_Dither::show(void) {
 
 void OctoWS2811_Dither::transfer() {
   ditherCycle++;
-  if (ditherCycle > (1 << DITHER_BITS) - 1) ditherCycle = 0;
+  if (ditherCycle > (1 << ditherBits) - 1) ditherCycle = 0;
 
   // it's ok to copy the drawing buffer to the frame buffer
   // during the 50us WS2811 reset time
