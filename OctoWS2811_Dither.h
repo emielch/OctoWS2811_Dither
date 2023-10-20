@@ -75,13 +75,13 @@ class OctoWS2811_Dither {
  public:
 #if defined(__IMXRT1062__)
   // Teensy 4.x can use any arbitrary group of pins!
-  OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void *copyBuf, void *drawBuf, uint8_t config = WS2811_GRB, uint8_t numPins = 8, const uint8_t *pinList = defaultPinList);
-  void begin(uint32_t numPerStrip, void *frameBuf, void *copyBuf, void *drawBuf, uint8_t config = WS2811_GRB, uint8_t numPins = 8, const uint8_t *pinList = defaultPinList);
+  OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void *copyBuf, void *drawBuf, uint8_t config = WS2811_GRB, byte ditBits = 255, uint8_t numPins = 8, const uint8_t *pinList = defaultPinList);
+  void begin(uint32_t numPerStrip, void *frameBuf, void *copyBuf, void *drawBuf, uint8_t config = WS2811_GRB, byte ditBits = 255, uint8_t numPins = 8, const uint8_t *pinList = defaultPinList);
   int numPixels(void);
 #else
   // Teensy 3.x is fixed to 8 pins: 2, 14, 7, 8, 6, 20, 21, 5
-  OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config = WS2811_GRB);
-  void begin(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config = WS2811_GRB);
+  OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void *copyBuf, void *drawBuf, uint8_t config = WS2811_GRB, byte ditBits = 255);
+  void begin(uint32_t numPerStrip, void *frameBuf, void *copyBuf, void *drawBuf, uint8_t config = WS2811_GRB, byte ditBits = 255);
   int numPixels(void) {
     return stripLen * 8;
   }
@@ -128,8 +128,10 @@ class OctoWS2811_Dither {
   }
 
  private:
+  static byte ditherBits;
   static uint8_t ditherCycle;
   static uint16_t stripLen;
+  static uint32_t bufsize;
   // static uint8_t brightness;
   static void *frameBuffer;
   static void *copyBuffer;
