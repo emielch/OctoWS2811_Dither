@@ -610,7 +610,8 @@ void OctoWS2811_Dither::setPixel(uint32_t num, int color) {
 
 int OctoWS2811_Dither::getPixel(uint32_t num) {
   if ((params & 0x1F) < 6) {
-    return *(((uint8_t *)drawBuffer) + num * 3) << 16 | *(((uint8_t *)drawBuffer) + num * 3 + 1) << 8 | *(((uint8_t *)drawBuffer) + num * 3 + 2);
+    const uint8_t *p = (uint8_t *)drawBuffer + num * 3;
+    return p[2] | (p[1] << 8) | (p[0] << 16);
   } else {
     return *(((uint32_t *)drawBuffer) + num * 4);
   }
