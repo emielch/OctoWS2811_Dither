@@ -87,6 +87,7 @@ class OctoWS2811_Dither {
   }
 #endif
   void begin(void);
+  byte setDitherBits(byte ditBits);
 
   void setPixel(uint32_t num, int color);
   void setPixel(uint32_t num, uint8_t red, uint8_t green, uint8_t blue) {

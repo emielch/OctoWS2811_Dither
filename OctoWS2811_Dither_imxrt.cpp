@@ -75,7 +75,7 @@ OctoWS2811_Dither::OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void 
   copyBuffer = copyBuf;
   drawBuffer = drawBuf;
   params = config;
-  ditherBits = ditBits;
+  setDitherBits(ditBits);
   if (numPins > NUM_DIGITAL_PINS) numPins = NUM_DIGITAL_PINS;
   numpins = numPins;
   memcpy(pinlist, pinList, numpins);
@@ -87,7 +87,7 @@ void OctoWS2811_Dither::begin(uint32_t numPerStrip, void *frameBuf, void *copyBu
   copyBuffer = copyBuf;
   drawBuffer = drawBuf;
   params = config;
-  ditherBits = ditBits;
+  setDitherBits(ditBits);
   if (numPins > NUM_DIGITAL_PINS) numPins = NUM_DIGITAL_PINS;
   numpins = numPins;
   memcpy(pinlist, pinList, numpins);
@@ -104,9 +104,6 @@ static volatile uint32_t *standard_gpio_addr(volatile uint32_t *fastgpio) {
 }
 
 void OctoWS2811_Dither::begin(void) {
-  ditherBits = min(ditherBits, DITHER_BITS);
-  ditherCycle = 0;
-
   if ((params & 0x1F) < 6) {
     numbytes = stripLen * 3;  // RGB formats
   } else {
@@ -231,6 +228,12 @@ void OctoWS2811_Dither::begin(void) {
   } else {
     drawBuffer = frameBuffer;
   }
+}
+
+byte OctoWS2811_Dither::setDitherBits(byte ditBits) {
+  if (ditBits <= DITHER_BITS) ditherBits = ditBits;
+  ditherCycle = 0;
+  return ditherBits;
 }
 
 static void fillbits(uint32_t *dest, const uint8_t *pixels, int n, uint32_t mask, const uint8_t *ditheredLUT) {

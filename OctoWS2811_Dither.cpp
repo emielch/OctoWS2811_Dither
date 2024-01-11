@@ -55,7 +55,7 @@ OctoWS2811_Dither::OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void 
   copyBuffer = copyBuf;
   drawBuffer = drawBuf;
   params = config;
-  ditherBits = ditBits;
+  setDitherBits(ditBits);
 }
 
 // Waveform timing: these set the high time for a 0 and 1 bit, as a fraction of
@@ -85,7 +85,7 @@ void OctoWS2811_Dither::begin(uint32_t numPerStrip, void *frameBuf, void *copyBu
   copyBuffer = copyBuf;
   drawBuffer = drawBuf;
   params = config;
-  ditherBits = ditBits;
+  setDitherBits(ditBits);
   begin();
 }
 
@@ -97,9 +97,6 @@ void OctoWS2811_Dither::begin(void) {
   } else {
     bufsize = stripLen * 32;  // RGBW formats
   }
-
-  ditherBits = min(ditherBits, DITHER_BITS);
-  ditherCycle = 0;
 
   // set up the buffers
   memset(frameBuffer, 0, bufsize);
@@ -257,6 +254,12 @@ void OctoWS2811_Dither::isr(void) {
 
   if (!update_pending) transfer();
   // digitalWriteFast(9, LOW);
+}
+
+byte OctoWS2811_Dither::setDitherBits(byte ditBits) {
+  if (ditBits <= DITHER_BITS) ditherBits = ditBits;
+  ditherCycle = 0;
+  return ditherBits;
 }
 
 int OctoWS2811_Dither::busy(void) {
