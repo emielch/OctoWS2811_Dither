@@ -71,6 +71,12 @@
 #define WS2811_400kHz 0x40  // Adafruit's Flora Pixels
 #define WS2813_800kHz 0x80  // WS2813 are close to 800 kHz but has 300 us frame set delay
 
+#if defined(__IMXRT1062__)
+#define DITHER_BITS 5
+#else
+#define DITHER_BITS 3
+#endif
+
 class OctoWS2811_Dither {
  public:
 #if defined(__IMXRT1062__)
@@ -89,6 +95,7 @@ class OctoWS2811_Dither {
   void begin(void);
   byte setDitherBits(byte ditBits);
   byte getDitherBits() { return ditherBits; }
+  void ditherLUTCalc(double bri);
 
   void setPixel(uint32_t num, int color);
   void setPixel(uint32_t num, uint8_t red, uint8_t green, uint8_t blue) {
@@ -130,8 +137,9 @@ class OctoWS2811_Dither {
   }
 
  private:
-  static byte ditherBits;
+  static uint8_t ditherBits;
   static uint8_t ditherCycle;
+  static uint8_t gammaTable[256 << DITHER_BITS];
   static uint16_t stripLen;
   static uint32_t bufsize;
   // static uint8_t brightness;

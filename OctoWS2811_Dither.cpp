@@ -27,15 +27,10 @@
 
 #include <Arduino.h>
 
-#include "gamma.h"
-
 #if defined(__MK20DX128__) || defined(__MK20DX256__) || defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__MKL26Z64__)
 
 uint16_t OctoWS2811_Dither::stripLen;
-// uint8_t OctoWS2811_Dither::brightness = 255;
 uint32_t OctoWS2811_Dither::bufsize;
-byte OctoWS2811_Dither::ditherBits;
-uint8_t OctoWS2811_Dither::ditherCycle;
 void *OctoWS2811_Dither::frameBuffer;
 void *OctoWS2811_Dither::copyBuffer;
 void *OctoWS2811_Dither::drawBuffer;
@@ -90,6 +85,8 @@ void OctoWS2811_Dither::begin(uint32_t numPerStrip, void *frameBuf, void *copyBu
 }
 
 void OctoWS2811_Dither::begin(void) {
+  ditherLUTCalc(100);
+
   uint32_t frequency;
 
   if ((params & 0x1F) < 6) {

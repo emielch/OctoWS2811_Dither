@@ -24,7 +24,6 @@
 #include <Arduino.h>
 
 #include "OctoWS2811_Dither.h"
-#include "gamma.h"
 
 #if defined(__IMXRT1062__)
 
@@ -39,12 +38,8 @@
 // smaller than the half the Cortex-M7 data cache.
 #define BYTES_PER_DMA 40
 
-byte OctoWS2811_Dither::ditherBits;
-uint8_t OctoWS2811_Dither::ditherCycle;
-
 uint8_t OctoWS2811_Dither::defaultPinList[8] = {2, 14, 7, 8, 6, 20, 21, 5};
 uint16_t OctoWS2811_Dither::stripLen;
-// uint8_t OctoWS2811_Dither::brightness = 255;
 void *OctoWS2811_Dither::frameBuffer;
 void *OctoWS2811_Dither::copyBuffer;
 void *OctoWS2811_Dither::drawBuffer;
@@ -104,6 +99,8 @@ static volatile uint32_t *standard_gpio_addr(volatile uint32_t *fastgpio) {
 }
 
 void OctoWS2811_Dither::begin(void) {
+  ditherLUTCalc(100);
+
   if ((params & 0x1F) < 6) {
     numbytes = stripLen * 3;  // RGB formats
   } else {
