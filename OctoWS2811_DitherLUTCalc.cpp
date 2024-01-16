@@ -2,11 +2,11 @@
 
 #include "OctoWS2811_Dither.h"
 
-byte OctoWS2811_Dither::ditherBits;
+uint8_t OctoWS2811_Dither::ditherBits;
 uint8_t OctoWS2811_Dither::ditherCycle;
 uint8_t OctoWS2811_Dither::gammaTable[256 << DITHER_BITS];
 
-void OctoWS2811_Dither::ditherLUTCalc(double bri) {
+void OctoWS2811_Dither::ditherLUTCalc(double bri, uint8_t finalAdjust) {
   if (bri > 8)
     bri = pow(((bri + 16) / 116), 3);
   else
@@ -37,7 +37,8 @@ void OctoWS2811_Dither::ditherLUTCalc(double bri) {
       pwmValue = value * 256;
       pwmValue += ditherValue;
       pwmValue = pwmValue >> 8;
-      gammaTable[n + (dither << 8)] = pwmValue;
+      uint8_t fa = n > 0 ? finalAdjust : 0;
+      gammaTable[n + (dither << 8)] = min(pwmValue + fa, 255);
     }
   }
 }
