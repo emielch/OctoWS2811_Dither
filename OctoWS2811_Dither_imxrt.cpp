@@ -225,7 +225,17 @@ void OctoWS2811_Dither::begin(void) {
 }
 
 byte OctoWS2811_Dither::setDitherBits(byte ditBits) {
-  if (ditBits <= DITHER_BITS) ditherBits = ditBits;
+  ditherBits = ditBits;
+  if (ditherBits == 255) {
+    ditherBits = 0;
+    float frameTime = stripLen * 0.00003;
+    while (frameTime * 2 < (1. / 25)) {
+      frameTime *= 2;
+      ditherBits++;
+    }
+  }
+  if (ditherBits > DITHER_BITS)
+    ditherBits = DITHER_BITS;
   ditherCycle = 0;
   return ditherBits;
 }
