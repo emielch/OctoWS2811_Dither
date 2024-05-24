@@ -81,8 +81,8 @@ class OctoWS2811_Dither {
  public:
 #if defined(__IMXRT1062__)
   // Teensy 4.x can use any arbitrary group of pins!
-  OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void *copyBuf, void *drawBuf, uint8_t config = WS2811_GRB, byte ditBits = 255, uint8_t numPins = 8, const uint8_t *pinList = defaultPinList);
-  void begin(uint32_t numPerStrip, void *frameBuf, void *copyBuf, void *drawBuf, uint8_t config = WS2811_GRB, byte ditBits = 255, uint8_t numPins = 8, const uint8_t *pinList = defaultPinList);
+  OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config = WS2811_GRB, byte ditBits = 255, uint8_t numPins = 8, const uint8_t *pinList = defaultPinList);
+  void begin(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config = WS2811_GRB, byte ditBits = 255, uint8_t numPins = 8, const uint8_t *pinList = defaultPinList);
   int numPixels(void);
 #else
   // Teensy 3.x is fixed to 8 pins: 2, 14, 7, 8, 6, 20, 21, 5

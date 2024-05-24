@@ -41,7 +41,6 @@
 uint8_t OctoWS2811_Dither::defaultPinList[8] = {2, 14, 7, 8, 6, 20, 21, 5};
 uint16_t OctoWS2811_Dither::stripLen;
 void *OctoWS2811_Dither::frameBuffer;
-void *OctoWS2811_Dither::copyBuffer;
 void *OctoWS2811_Dither::drawBuffer;
 uint8_t OctoWS2811_Dither::params;
 DMAChannel OctoWS2811_Dither::dma1;
@@ -64,10 +63,9 @@ volatile bool dma_first;
 static volatile uint8_t update_ready = 0;
 static uint32_t update_begin_micros = 0;
 
-OctoWS2811_Dither::OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void *copyBuf, void *drawBuf, uint8_t config, byte ditBits, uint8_t numPins, const uint8_t *pinList) {
+OctoWS2811_Dither::OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config, byte ditBits, uint8_t numPins, const uint8_t *pinList) {
   stripLen = numPerStrip;
   frameBuffer = frameBuf;
-  copyBuffer = copyBuf;
   drawBuffer = drawBuf;
   params = config;
   setDitherBits(ditBits);
@@ -76,10 +74,9 @@ OctoWS2811_Dither::OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void 
   memcpy(pinlist, pinList, numpins);
 }
 
-void OctoWS2811_Dither::begin(uint32_t numPerStrip, void *frameBuf, void *copyBuf, void *drawBuf, uint8_t config, byte ditBits, uint8_t numPins, const uint8_t *pinList) {
+void OctoWS2811_Dither::begin(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config, byte ditBits, uint8_t numPins, const uint8_t *pinList) {
   stripLen = numPerStrip;
   frameBuffer = frameBuf;
-  copyBuffer = copyBuf;
   drawBuffer = drawBuf;
   params = config;
   setDitherBits(ditBits);
@@ -257,10 +254,9 @@ static void fillbits(uint32_t *dest, const uint8_t *pixels, int n, uint32_t mask
 
 void OctoWS2811_Dither::show(void) {
   update_ready = 1;
-  memcpy(copyBuffer, drawBuffer, numbytes * numpins);
   // wait for any prior DMA operation
-  while (!dma3.complete())
-    ;  // wait
+  while (!dma3.complete());  // wait
+  memcpy(frameBuffer, drawBuffer, numbytes * numpins);
   update_ready = 0;
 
   transfer();
@@ -269,12 +265,6 @@ void OctoWS2811_Dither::show(void) {
 void OctoWS2811_Dither::transfer() {
   ditherCycle++;
   if (ditherCycle > (1 << ditherBits) - 1) ditherCycle = 0;
-
-  // it's ok to copy the drawing buffer to the frame buffer
-  // during the 50us WS2811 reset time
-  if (drawBuffer != frameBuffer) {
-    memcpy(frameBuffer, copyBuffer, numbytes * numpins);
-  }
 
   // disable timers
   uint16_t enable = TMR4_ENBL;
@@ -335,8 +325,7 @@ void OctoWS2811_Dither::transfer() {
   TMR4_CNTR2 = comp1load[0] + 1;
 
   // wait for WS2812 reset
-  while (micros() - update_begin_micros < numbytes * 10 + 300)
-    ;
+  while (micros() - update_begin_micros < numbytes * 10 + 300);
 
   // start everything running!
   TMR4_ENBL = enable | 7;
