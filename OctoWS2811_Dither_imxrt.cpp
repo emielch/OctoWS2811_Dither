@@ -273,9 +273,7 @@ void OctoWS2811_Dither::show(void) {
 }
 
 void OctoWS2811_Dither::transfer() {
-  ditherCycle++;
-  if (ditherCycle > (1 << ditherBits) - 1) ditherCycle = 0;
-
+  if (++ditherCycle > (1 << ditherBits) - 1) ditherCycle = 0;
   // disable timers
   uint16_t enable = TMR4_ENBL;
   TMR4_ENBL = enable & ~7;
@@ -295,8 +293,9 @@ void OctoWS2811_Dither::transfer() {
   uint32_t count = numbytes;
   if (count > BYTES_PER_DMA * 2) count = BYTES_PER_DMA * 2;
   framebuffer_index = count;
-  const uint8_t *ditheredLUT = gammaTable + (ditherCycle << 8);
   for (uint32_t i = 0; i < numpins; i++) {
+    if (++ditherCycle > (1 << ditherBits) - 1) ditherCycle = 0;
+    const uint8_t *ditheredLUT = gammaTable + (ditherCycle << 8);
     fillbits(bitdata + pin_offset[i], (uint8_t *)frameBuffer + i * numbytes,
              count, 1 << pin_bitnum[i], ditheredLUT);
   }
@@ -366,8 +365,9 @@ void OctoWS2811_Dither::isr(void) {
   uint32_t count = numbytes - framebuffer_index;
   if (count > BYTES_PER_DMA) count = BYTES_PER_DMA;
   framebuffer_index = index + count;
-  const uint8_t *ditheredLUT = gammaTable + (ditherCycle << 8);
-  for (int i = 0; i < numpins; i++) {
+  for (uint32_t i = 0; i < numpins; i++) {
+    if (++ditherCycle > (1 << ditherBits) - 1) ditherCycle = 0;
+    const uint8_t *ditheredLUT = gammaTable + (ditherCycle << 8);
     fillbits(dest + pin_offset[i], (uint8_t *)frameBuffer + index + i * numbytes,
              count, 1 << pin_bitnum[i], ditheredLUT);
   }
