@@ -71,6 +71,10 @@
 #define WS2811_400kHz 0x40  // Adafruit's Flora Pixels
 #define WS2813_800kHz 0x80  // WS2813 are close to 800 kHz but has 300 us frame set delay
 
+#define WS2811_TH_TL 1.25e-6
+#define WS2811_T0H 0.30e-6
+#define WS2811_T1H 0.75e-6
+
 #if defined(__IMXRT1062__)
 #define DITHER_BITS 5
 #else
@@ -81,8 +85,8 @@ class OctoWS2811_Dither {
  public:
 #if defined(__IMXRT1062__)
   // Teensy 4.x can use any arbitrary group of pins!
-  OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config = WS2811_GRB, byte ditBits = 255, uint8_t numPins = 8, const uint8_t *pinList = defaultPinList);
-  void begin(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config = WS2811_GRB, byte ditBits = 255, uint8_t numPins = 8, const uint8_t *pinList = defaultPinList);
+  OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config = WS2811_GRB, byte ditBits = 255, uint8_t numPins = 8, const uint8_t *pinList = defaultPinList, double thtl = WS2811_TH_TL, double t0h = WS2811_T0H, double t1h = WS2811_T1H);
+  void begin(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config = WS2811_GRB, byte ditBits = 255, uint8_t numPins = 8, const uint8_t *pinList = defaultPinList, double thtl = WS2811_TH_TL, double t0h = WS2811_T0H, double t1h = WS2811_T1H);
   int numPixels(void);
 #else
   // Teensy 3.x is fixed to 8 pins: 2, 14, 7, 8, 6, 20, 21, 5
@@ -147,6 +151,7 @@ class OctoWS2811_Dither {
   static void *copyBuffer;
   static void *drawBuffer;
   static uint8_t params;
+  static double TH_TL, T0H, T1H;
   static DMAChannel dma1, dma2, dma3;
   static void end_isr(void);
   static void isr(void);

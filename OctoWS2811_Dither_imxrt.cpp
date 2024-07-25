@@ -27,10 +27,6 @@
 
 #if defined(__IMXRT1062__)
 
-#define TH_TL 1.25e-6
-#define T0H 0.30e-6
-#define T1H 0.75e-6
-
 // Ordinary RGB data is converted to GPIO bitmasks on-the-fly using
 // a transmit buffer sized for 2 DMA transfers.  The larger this setting,
 // the more interrupt latency OctoWS2811_Dither can tolerate, but the transmit
@@ -43,9 +39,8 @@ uint16_t OctoWS2811_Dither::stripLen;
 void *OctoWS2811_Dither::frameBuffer;
 void *OctoWS2811_Dither::drawBuffer;
 uint8_t OctoWS2811_Dither::params;
-DMAChannel OctoWS2811_Dither::dma1;
-DMAChannel OctoWS2811_Dither::dma2;
-DMAChannel OctoWS2811_Dither::dma3;
+double OctoWS2811_Dither::TH_TL, OctoWS2811_Dither::T0H, OctoWS2811_Dither::T1H;
+DMAChannel OctoWS2811_Dither::dma1, OctoWS2811_Dither::dma2, OctoWS2811_Dither::dma3;
 static DMASetting dma2next;
 static uint32_t numbytes;
 
@@ -63,7 +58,7 @@ volatile bool dma_first;
 static volatile uint8_t update_ready = 0;
 static uint32_t update_begin_micros = 0;
 
-OctoWS2811_Dither::OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config, byte ditBits, uint8_t numPins, const uint8_t *pinList) {
+OctoWS2811_Dither::OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config, byte ditBits, uint8_t numPins, const uint8_t *pinList, double thtl = WS2811_TH_TL, double t0h = WS2811_T0H, double t1h = WS2811_T1H) {
   stripLen = numPerStrip;
   frameBuffer = frameBuf;
   drawBuffer = drawBuf;
@@ -72,9 +67,12 @@ OctoWS2811_Dither::OctoWS2811_Dither(uint32_t numPerStrip, void *frameBuf, void 
   if (numPins > NUM_DIGITAL_PINS) numPins = NUM_DIGITAL_PINS;
   numpins = numPins;
   memcpy(pinlist, pinList, numpins);
+  TH_TL = thtl;
+  T0H = t0h;
+  T1H = t1h;
 }
 
-void OctoWS2811_Dither::begin(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config, byte ditBits, uint8_t numPins, const uint8_t *pinList) {
+void OctoWS2811_Dither::begin(uint32_t numPerStrip, void *frameBuf, void *drawBuf, uint8_t config, byte ditBits, uint8_t numPins, const uint8_t *pinList, double thtl = WS2811_TH_TL, double t0h = WS2811_T0H, double t1h = WS2811_T1H) {
   stripLen = numPerStrip;
   frameBuffer = frameBuf;
   drawBuffer = drawBuf;
@@ -83,6 +81,9 @@ void OctoWS2811_Dither::begin(uint32_t numPerStrip, void *frameBuf, void *drawBu
   if (numPins > NUM_DIGITAL_PINS) numPins = NUM_DIGITAL_PINS;
   numpins = numPins;
   memcpy(pinlist, pinList, numpins);
+  TH_TL = thtl;
+  T0H = t0h;
+  T1H = t1h;
   begin();
 }
 
